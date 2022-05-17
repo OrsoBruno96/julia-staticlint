@@ -127,7 +127,7 @@ look at it when using the function to collect the array of errors (the first
 output).
 """
 function lint_collect_hints(x::EXPR,
-                            server,
+                            env,
                             missingrefs=:all,
                             isquoted=false,
                             errs=T_Error[],
@@ -164,16 +164,16 @@ function lint_collect_hints(x::EXPR,
         end
     elseif (isquoted &&
             missingrefs == :all &&
-            should_mark_missing_getfield_ref(x, server))
+            should_mark_missing_getfield_ref(x, env))
         push!(errs, (ErrorSpan(pos, pos+x.span), x))
     end
 
     for a in x
         if a.args === nothing
-            lint_collect_hints(a, server, missingrefs, isquoted, errs, pos)
+            lint_collect_hints(a, env, missingrefs, isquoted, errs, pos)
             pos += a.fullspan
         else
-            _,pos = lint_collect_hints(a, server, missingrefs, isquoted, errs, pos)
+            _,pos = lint_collect_hints(a, env, missingrefs, isquoted, errs, pos)
         end
     end
 
@@ -251,8 +251,9 @@ function lint_file(rootfile::String,
     hints = Dict()
     slopts = SL.LintOptions(:)
     for (path, file) in server.files
-        SL.check_all(file.cst, slopts, server)
-        hints[path],_ = lint_collect_hints(file.cst, server)
+        env = SL.getenv(file, server)
+        SL.check_all(file.cst, slopts, env)
+        hints[path], _ = lint_collect_hints(file.cst, env)
     end
 
     # Send errors back to client
@@ -305,8 +306,10 @@ env = dirname(SS.Pkg.Types.Context().env.project_file)
 # Setup server
 server = SL.FileServer()
 ssi = SymbolServerInstance(depot, cache)
-_, server.symbolserver = SS.getstore(ssi, env)
-server.symbol_extends  = SS.collect_extended_methods(server.symbolserver)
+# _, server.symbolserver = SS.getstore(ssi, env)
+# server.symbol_extends  = SS.collect_extended_methods(server.symbolserver)
+
+
 
 @info print_time()*"Started server"
 
